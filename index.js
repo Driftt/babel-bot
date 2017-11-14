@@ -2,32 +2,51 @@ const express = require('express')
 const app = express()
 const bodyParser = require('body-parser')
 const request = require('superagent');
-const orm = require('pg-orm');
+const Sequelize = require('sequelize');
+const sequelize = new Sequelize('postgres', 'postgres', 'testpassword', {
+  host: 'localhost',
+  dialect: 'postgres',
 
-const Conversation = orm.build({
-  'tableName': 'conversations',
-  'tableProperties': {
-    'id': {
-      'type': 'key'
-    },
-    'status': {
-      'type': 'string',
-      'required': true
-    },
-    'language': {
-      'type': 'string',
-      'required': true
-    },
-    'first_seen_at': {
-      'type': 'number',
-      'required': true
-    },
-    'first_seen_id': {
-      'type': 'number',
-      'required': true
-    }
+  pool: {
+    max: 5,
+    min: 0,
+    acquire: 30000,
+    idle: 10000
+  },
+});
+
+sequelize
+  .authenticate()
+  .then(() => {
+    console.log('Connection has been established successfully.');
+  })
+  .catch(err => {
+    console.error('Unable to connect to the database:', err);
+  });
+
+
+const Conversation = sequelize.define('conversations', {
+  id: {
+    type: Sequelize.INTEGER,
+    primaryKey: true,
+  },
+  status: {
+    type: Sequelize.STRING
+  },
+  language: {
+    type: Sequelize.STRING
+  },
+  first_seen_at: {
+    type: Sequelize.INTEGER
+  },
+  first_seen_id: {
+    type: Sequelize.INTEGER
   }
-})
+});
+
+// force: true will drop the table if it already exists
+Conversation.sync({ force: true })
+
 
 const TRANSLATE_API_BASE = 'https://translation.googleapis.com/language/translate/v2'
 const CONVERSATION_API_BASE = 'https://conversation2.api.driftqa.com'
@@ -145,26 +164,21 @@ app.use(bodyParser.json())
 app.listen(process.env.PORT || 3000, () => console.log('Example app listening on port 3000!'))
 app.post('/api', (req, res) => {
   if (req.body.type === 'new_message') {
-    console.log('new messages')
     handleNewMessage(req.body.orgId, req.body.data).then(response => {
-      console.log('response', response)
       if (response) {
         return sendMessage(req.body.data.conversationId, response)
       }
     })
   }
   if (req.body.type === 'button_action') {
-    handleButton(req.body.orgId, req.body.data)
+    handleButtonAction(req.body.orgId, req.body.data)
   }
-  console.log()
   return res.send('ok')
 })
 
 
 const handleNewMessage = (orgId, data) => {
-  console.log('data', data)
   if (data.type === 'chat' && data.author.type === 'contact') {
-    console.log('new chat')
     return handleContactChat(orgId, data)
   }
   if (data.type === 'private_note' && data.author.type === 'user') {
@@ -180,23 +194,25 @@ const handleContactChat = (orgId, data) => {
   return Conversation.findById(conversationId)
     .then(conversation => {
       if (!conversation) {
-        return Conversation.create().then(createdConversation => {
-          const language = detect(body)
-          createdConversation.status = (language === 'en')
-            ? 'CONVERSATION_STATUS_OFF'
-            : 'CONVERSATION_STATUS_PENDING'
-          createdConversation.language = language
-          return createdConversation.update().then(() => parseConversation(createdConversation, body, true))
+        return Conversation.create({ id: conversationId }).then(createdConversation => {
+          createdConversation.id = conversationId
+          return detect(body).then(language => {
+            createdConversation.status = (language === 'en')
+              ? 'CONVERSATION_STATUS_OFF'
+              : 'CONVERSATION_STATUS_PENDING'
+            createdConversation.language = language
+            return createdConversation.save().then(() => parseConversation(orgId, createdConversation, body, true))
+          })
         })
       } else {
-        return parseConversation(conversation, body)
+        return parseConversation(orgId, conversation, body)
       }
     })
 }
 
-const parseConversation = (conversation, body, newConversation = false) => {
+const parseConversation = (orgId, conversation, body, newConversation = false) => {
   if (conversation.status !== 'CONVERSATION_STATUS_OFF') {
-    translate(body, conversation.language).then(translatedText => {
+    return translate(body, conversation.get('language')).then(translatedText => {
       if (newConversation) {
         const buttons = [
           {
@@ -204,12 +220,11 @@ const parseConversation = (conversation, body, newConversation = false) => {
             'reaction': 'You got it dude.'},
           { 'label': 'No thanks.', 'value': 'off', 'type': 'action', 'reaction': 'No worries.'},
         ]
-
         return makeMessage(
           orgId,
           'private_prompt',
           translatedText,
-          `It looks like this user is speaking <strong>${LANGUAGES[conversation.language]}</strong>. Here\'s a translation:`,
+          `It looks like this user is speaking <strong>${LANGUAGES[conversation.get('language')]}</strong>. Here\'s a translation:`,
           'Would you like me help translate the rest of this conversation?',
           buttons
         )
@@ -217,8 +232,8 @@ const parseConversation = (conversation, body, newConversation = false) => {
         return makeMessage(
           orgId,
           'private_prompt',
-          translated_text,
-          `Automatically translated from <strong>${LANGUAGES[conversation.language]}</strong>`
+          translatedText,
+          `Automatically translated from <strong>${LANGUAGES[conversation.get('language')]}</strong>`
         )
       }
     })
@@ -230,19 +245,21 @@ const handleUserPrivateNote = (orgId, data) => {
   
   if (body.startsWith('/translate')) {
     const textToTranslate = body.replace('/translate ', '')
-    Conversation.findById(data.conversationId).then(conversation => {
+    return Conversation.findById(data.conversationId).then(conversation => {
       if (conversation) {
-        return translate(body, conversation.language).then(translatedText => {
+        return translate(textToTranslate, 'en', conversation.get('language')).then(translatedText => {
+          const buttons = [
+            { 'label': 'Send', 'value': translatedText, 'type': 'reply', 'style': 'primary' },
+            { 'label': 'Edit', 'value': translatedText, 'type': 'compose' },
+            { 'label': 'Cancel', 'value': 'cancel', 'type': 'action' },
+          ]
           return makeMessage(
             orgId,
             'private_prompt',
-            translated_text,
-            `Automatically translated to <strong>${LANGUAGES[conversation.language]}</strong>`,
-            [
-              { 'label': 'Send', 'value': translated_text, 'type': 'reply', 'style': 'primary' },
-              { 'label': 'Edit', 'value': translated_text, 'type': 'compose' },
-              { 'label': 'Cancel', 'value': 'cancel', 'type': 'action' },
-            ]
+            translatedText,
+            `Automatically translated to <strong>${LANGUAGES[conversation.get('language')]}</strong>`,
+            undefined,
+            buttons
           )
         })
       }
@@ -257,33 +274,37 @@ const handleButtonAction = (orgId, data) => {
     if (conversation) {
       if (value === 'on') {
         conversation.status = 'CONVERSATION_STATUS_ON'
-        return conversation.update()
+        return conversation.save()
       }
       if (value === 'off') {
         conversation.status = 'CONVERSATION_STATUS_OFF'
-        return conversation.update()
+        return conversation.save()
       }
     }
   })
 }
 
 const detect = (text) => {
-  return request.get(TRANSLATE_API_BASE + '/detect', params = { 'q': text, 'key': process.env.GOOGLE_APIKEY }).then(data => 
-    data.data.detections[0][0].language)
+  return request.post(TRANSLATE_API_BASE + `/detect?key=${process.env.GOOGLE_API_KEY}`, { 'q': text }).then(data => {
+    return data.body.data.detections[0][0].language
+  })
+  .catch(err => console.log(err))
 }
 
-const translate = (text, target = 'en', source) => {
-  return requests.get(TRANSLATE_API_BASE, params = { 'q': text, 'target': target, 'source': source, 'key': process.env.GOOGLE_APIKEY }).then(data => 
-    data.translated_text)
+const translate = (text, source, target = 'en') => {
+  return request.post(TRANSLATE_API_BASE + `?key=${process.env.GOOGLE_API_KEY}`, { 'q': text, 'target': target, 'source': source }).then(data => {
+    return data.body.data.translations[0].translatedText
+  })
+  .catch(err => console.log(err))
 }
 
-const makeMessage = (orgId, type, text, pretext = '', posttext = '', button) => {
+const makeMessage = (orgId, type, text, pretext = '', posttext = '', buttons) => {
   const body = `<div>${pretext}<blockquote>${text}</blockquote>${posttext}</div>`
   return {
     orgId,
     body,
     type,
-    button
+    buttons
   }
 }
 
