@@ -3,17 +3,8 @@ const app = express()
 const bodyParser = require('body-parser')
 const request = require('superagent');
 const Sequelize = require('sequelize');
-const sequelize = new Sequelize('postgres', 'postgres', 'testpassword', {
-  host: 'localhost',
-  dialect: 'postgres',
 
-  pool: {
-    max: 5,
-    min: 0,
-    acquire: 30000,
-    idle: 10000
-  },
-});
+const sequelize = new Sequelize(process.env.DATABASE_URL || 'postgres://postgres:testpassword@localhost:5432/postgres')
 
 sequelize
   .authenticate()
@@ -45,7 +36,9 @@ const Conversation = sequelize.define('conversations', {
 });
 
 // force: true will drop the table if it already exists
-Conversation.sync({ force: true })
+Conversation.sync({
+  force: true
+})
 
 
 const TRANSLATE_API_BASE = 'https://translation.googleapis.com/language/translate/v2'
@@ -190,16 +183,18 @@ const handleNewMessage = (orgId, data) => {
 const handleContactChat = (orgId, data) => {
   const body = data.body
   const conversationId = data.conversationId
-  
+
   return Conversation.findById(conversationId)
     .then(conversation => {
       if (!conversation) {
-        return Conversation.create({ id: conversationId }).then(createdConversation => {
+        return Conversation.create({
+          id: conversationId
+        }).then(createdConversation => {
           createdConversation.id = conversationId
           return detect(body).then(language => {
-            createdConversation.status = (language === 'en')
-              ? 'CONVERSATION_STATUS_OFF'
-              : 'CONVERSATION_STATUS_PENDING'
+            createdConversation.status = (language === 'en') ?
+              'CONVERSATION_STATUS_OFF' :
+              'CONVERSATION_STATUS_PENDING'
             createdConversation.language = language
             return createdConversation.save().then(() => parseConversation(orgId, createdConversation, body, true))
           })
@@ -214,11 +209,19 @@ const parseConversation = (orgId, conversation, body, newConversation = false) =
   if (conversation.status !== 'CONVERSATION_STATUS_OFF') {
     return translate(body, conversation.get('language')).then(translatedText => {
       if (newConversation) {
-        const buttons = [
+        const buttons = [{
+            'label': 'Translate away!',
+            'value': 'on',
+            'type': 'action',
+            'style': 'primary',
+            'reaction': 'You got it dude.'
+          },
           {
-            'label': 'Translate away!', 'value': 'on', 'type': 'action', 'style': 'primary',
-            'reaction': 'You got it dude.'},
-          { 'label': 'No thanks.', 'value': 'off', 'type': 'action', 'reaction': 'No worries.'},
+            'label': 'No thanks.',
+            'value': 'off',
+            'type': 'action',
+            'reaction': 'No worries.'
+          },
         ]
         return makeMessage(
           orgId,
@@ -242,16 +245,28 @@ const parseConversation = (orgId, conversation, body, newConversation = false) =
 
 const handleUserPrivateNote = (orgId, data) => {
   const body = data.body
-  
+
   if (body.startsWith('/translate')) {
     const textToTranslate = body.replace('/translate ', '')
     return Conversation.findById(data.conversationId).then(conversation => {
       if (conversation) {
         return translate(textToTranslate, 'en', conversation.get('language')).then(translatedText => {
-          const buttons = [
-            { 'label': 'Send', 'value': translatedText, 'type': 'reply', 'style': 'primary' },
-            { 'label': 'Edit', 'value': translatedText, 'type': 'compose' },
-            { 'label': 'Cancel', 'value': 'cancel', 'type': 'action' },
+          const buttons = [{
+              'label': 'Send',
+              'value': translatedText,
+              'type': 'reply',
+              'style': 'primary'
+            },
+            {
+              'label': 'Edit',
+              'value': translatedText,
+              'type': 'compose'
+            },
+            {
+              'label': 'Cancel',
+              'value': 'cancel',
+              'type': 'action'
+            },
           ]
           return makeMessage(
             orgId,
@@ -285,17 +300,23 @@ const handleButtonAction = (orgId, data) => {
 }
 
 const detect = (text) => {
-  return request.post(TRANSLATE_API_BASE + `/detect?key=${process.env.GOOGLE_API_KEY}`, { 'q': text }).then(data => {
-    return data.body.data.detections[0][0].language
-  })
-  .catch(err => console.log(err))
+  return request.post(TRANSLATE_API_BASE + `/detect?key=${process.env.GOOGLE_API_KEY}`, {
+      'q': text
+    }).then(data => {
+      return data.body.data.detections[0][0].language
+    })
+    .catch(err => console.log(err))
 }
 
 const translate = (text, source, target = 'en') => {
-  return request.post(TRANSLATE_API_BASE + `?key=${process.env.GOOGLE_API_KEY}`, { 'q': text, 'target': target, 'source': source }).then(data => {
-    return data.body.data.translations[0].translatedText
-  })
-  .catch(err => console.log(err))
+  return request.post(TRANSLATE_API_BASE + `?key=${process.env.GOOGLE_API_KEY}`, {
+      'q': text,
+      'target': target,
+      'source': source
+    }).then(data => {
+      return data.body.data.translations[0].translatedText
+    })
+    .catch(err => console.log(err))
 }
 
 const makeMessage = (orgId, type, text, pretext = '', posttext = '', buttons) => {

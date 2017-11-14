@@ -1,0 +1,10 @@
+{
+  "name": "Babel-Bot",
+  "description": "Translation bot for Drift",
+  "repository": "https://github.com/Driftt/babel-bot",
+  "addons": [
+    {
+      "plan": "heroku-postgresql:hobby-dev"
+    }
+  ]
+}
