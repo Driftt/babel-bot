@@ -1,6 +1,7 @@
-# Driffy
-Giphy for Drift
+# Babel-Bot
+Transation bot for Drift
 
+Requires a Google API key with access to the Google Cloud Transation service. You can create one from here: https://cloud.google.com/translate/
 ## Deploying to Heroku
 
 ### CLI install 
