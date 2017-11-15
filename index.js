@@ -214,13 +214,17 @@ const parseConversation = (orgId, conversation, body, newConversation = false) =
             'value': 'on',
             'type': 'action',
             'style': 'primary',
-            'reaction': { 'message': 'You got it dude.' }
+            'response': {
+              'message': 'You got it dude.',
+            }
           },
           {
             'label': 'No thanks.',
             'value': 'off',
             'type': 'action',
-            'reaction': { 'message': 'No worries.' }
+            'response': {
+              'message': 'No worries.',
+            }
           },
         ]
         return makeMessage(
@@ -258,20 +262,23 @@ const handleUserPrivateNote = (orgId, data) => {
               'label': 'Send',
               'value': translatedText,
               'type': 'reply',
-              'style': 'primary'
+              'style': 'primary',
+              'reaction': {
+                type: 'delete'
+              }
             },
             {
               'label': 'Edit',
               'value': translatedText,
-              'type': 'compose'
+              'type': 'compose',
+              'reaction': {
+                type: 'delete'
+              }
             },
             {
               'label': 'Cancel',
               'value': 'cancel',
-              'type': 'action',
-              'response': {
-                'type': 'noop'
-              }
+              'type': 'noop',
             },
           ]
           return makeMessage(
