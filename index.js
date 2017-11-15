@@ -245,10 +245,13 @@ const parseConversation = (orgId, conversation, body, newConversation = false) =
 
 const handleUserPrivateNote = (orgId, data) => {
   const body = data.body
+  const messageId = data.id
+  const conversationId = data.conversationId
 
   if (body.startsWith('/translate')) {
     const textToTranslate = body.replace('/translate ', '')
-    return Conversation.findById(data.conversationId).then(conversation => {
+    sendMessage(conversationId, createDeleteMessage(orgId, messageId))
+    return Conversation.findById(conversationId).then(conversation => {
       if (conversation) {
         return translate(textToTranslate, 'en', conversation.get('language')).then(translatedText => {
           const buttons = [{
@@ -283,6 +286,16 @@ const handleUserPrivateNote = (orgId, data) => {
       }
     })
   }
+}
+
+const createDeleteMessage = (orgId, idToDelete) => {
+   return {
+    orgId,
+    type: 'edit',
+    editedMessageId: idToDelete,
+    editType: 'delete',
+    body: ''
+   }
 }
 
 const handleButtonAction = (orgId, data) => {
@@ -337,4 +350,5 @@ const sendMessage = (conversationId, message) => {
     .set('Content-Type', 'application/json')
     .set(`Authorization`, `bearer ${TOKEN}`)
     .send(message)
+    .catch(err => console.log(err))
 }
