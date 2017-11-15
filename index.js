@@ -42,7 +42,7 @@ Conversation.sync({
 
 
 const TRANSLATE_API_BASE = 'https://translation.googleapis.com/language/translate/v2'
-const CONVERSATION_API_BASE = 'https://conversation2.api.driftqa.com'
+const CONVERSATION_API_BASE = 'https://api.driftqa.com/v1/conversations'
 
 const LANGUAGES = {
   "af": "Afrikaans",
@@ -346,7 +346,7 @@ const makeMessage = (orgId, type, text, pretext = '', posttext = '', buttons) =>
 }
 
 const sendMessage = (conversationId, message) => {
-  return request.post(CONVERSATION_API_BASE + `/open/conversations/${conversationId}/messages`)
+  return request.post(CONVERSATION_API_BASE + `/${conversationId}/messages`)
     .set('Content-Type', 'application/json')
     .set(`Authorization`, `bearer ${TOKEN}`)
     .send(message)
