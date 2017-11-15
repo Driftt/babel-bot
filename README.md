@@ -12,9 +12,9 @@ Requires a Google API key with access to the Google Cloud Transation service. Yo
 
 3. `heroku addons:create heroku-postgresql:hobby-dev`
 
-4. `heroku config:set BOT_API_TOKEN={BOT_API_TOKEN}`
+4. `heroku config:set BOT_API_TOKEN={OAuth Access token}`
 
-5. `heroku config:set GOOGLE_API_KEY={GOOGLE_API_KEY}`
+5. `heroku config:set GOOGLE_API_KEY={Google Api Key}`
 
 ### GUI install
 
