@@ -211,7 +211,7 @@ const parseConversation = (orgId, conversation, body, newConversation = false) =
       if (newConversation) {
         const buttons = [{
             'label': 'Translate away!',
-            'value': 'on',
+            'value': 'babel-on',
             'type': 'action',
             'style': 'primary',
             'response': {
@@ -220,7 +220,7 @@ const parseConversation = (orgId, conversation, body, newConversation = false) =
           },
           {
             'label': 'No thanks.',
-            'value': 'off',
+            'value': 'babel-off',
             'type': 'action',
             'response': {
               'message': 'No worries.',
@@ -306,7 +306,11 @@ const createDeleteMessage = (orgId, idToDelete) => {
 }
 
 const handleButtonAction = (orgId, data) => {
-  const value = data.button.value
+  const buttonValue = data.button.value
+  if (!buttonValue.startsWith('babel-')) {
+    return
+  }
+  const value = buttonValue.replace('babel-', '')
   const conversationId = data.conversationId
   return Conversation.findById(conversationId).then(conversation => {
     if (conversation) {
