@@ -214,7 +214,8 @@ const parseConversation = (orgId, conversation, body, newConversation = false) =
             'value': 'babel-on',
             'type': 'action',
             'style': 'primary',
-            'response': {
+            'reaction': {
+              'type': 'replace',
               'message': 'You got it dude.',
             }
           },
@@ -222,7 +223,8 @@ const parseConversation = (orgId, conversation, body, newConversation = false) =
             'label': 'No thanks.',
             'value': 'babel-off',
             'type': 'action',
-            'response': {
+            'reaction': {
+              'type': 'replace',
               'message': 'No worries.',
             }
           },
