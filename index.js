@@ -42,7 +42,7 @@ Conversation.sync({
 
 
 const TRANSLATE_API_BASE = 'https://translation.googleapis.com/language/translate/v2'
-const CONVERSATION_API_BASE = 'https://driftapi.com/v1/conversations'
+const CONVERSATION_API_BASE = process.env.QA ? 'https://driftapiqa.com/v1/conversations' : 'https://driftapi.com/v1/conversations'
 
 const LANGUAGES = {
   "af": "Afrikaans",
