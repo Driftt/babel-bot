@@ -4,7 +4,7 @@
 
 Babel-Bot
 ---
-Conversation Translation bot for Drift.
+Example Project: Conversation Translation bot for Drift.
 
 <i>Note this project is no longer actively maintained.</i>
 
