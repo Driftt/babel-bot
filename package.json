@@ -23,7 +23,7 @@
     "nodemon": "1.18.4",
     "pg": "7.4.0",
     "pg-hstore": "2.3.2",
-    "sequelize": "4.35.2",
+    "sequelize": "6.29.0",
     "superagent": "3.8.1"
   }
 }
