@@ -21,7 +21,7 @@
     "body-parser": "1.18.2",
     "express": "4.16.2",
     "nodemon": "1.18.4",
-    "pg": "7.4.0",
+    "pg": "8.11.1",
     "pg-hstore": "2.3.2",
     "sequelize": "4.35.2",
     "superagent": "3.8.1"
